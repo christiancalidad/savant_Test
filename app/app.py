@@ -4,6 +4,8 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
@@ -81,3 +83,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=ErrorResponse(detail="Error interno del servidor").model_dump(),
     )
+
+# Serve simple frontend
+app.mount("/frontend", StaticFiles(directory="app/frontend"), name="frontend")
+
+@app.get("/")
+def index():
+    return FileResponse("app/frontend/index.html")

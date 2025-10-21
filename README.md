@@ -13,9 +13,47 @@ Servicio FastAPI que recibe audio (.wav/.mp3), lo transcribe (ASR directo a Azur
 - CI/CD: workflow de GitHub Actions para construir y desplegar contenedor a Azure Web App (container).
 
 ### Arquitectura (alto nivel)
+![Arquitectura](docs/azure_ai_architecture_simple.png)
+
 ```
 Audio (.wav/.mp3) → [ASR REST] → Texto → [LLM LangChain + Azure OpenAI] → Respuesta texto → [TTS REST] → Audio (base64)
 ```
+
+
+## Decisiones y justificación
+- 3 modelos (ASR, LLM, TTS): se eligió separar las capacidades para demostrar la integración de cada servicio de Azure (transcripción, generación y síntesis). Alternativamente, se podría simplificar con un único modelo multimodal (p. ej., GPT-4o) que procese audio de entrada y devuelva texto/audio, reduciendo latencia y complejidad operativa, a costa de menor control por etapa.
+- Docker + GitHub Actions: se usan para garantizar CI/CD reproducible. La imagen se construye siempre igual localmente y en el pipeline, y se despliega a Azure App Service (contenedor) desde ACR.
+- Ecosistema Azure: se aprovecha Azure OpenAI/Audio (Azure AI Foundry) para cumplir con requisitos de seguridad y cumplimiento, integración nativa con redes privadas, identidades administradas y observabilidad (Application Insights).
+- Endpoint `/health`: permite monitoreo básico de liveness en App Service o probes externos. Responde `{ "status": "ok" }` con baja latencia.
+- Pruebas unitarias: existen tests mínimos (salud y flujo de voz con stub) para verificar que la aplicación arranca y que el endpoint principal responde con el contrato esperado. Se pueden ampliar con casos de error, límites y contratos por servicio.
+- Pydantic (pydantic-settings): centraliza la configuración por variables de entorno, con tipos por campo y validaciones simples, facilitando cambios entre entornos sin modificar código.
+- Funciones asíncronas: las llamadas a servicios externos (ASR/NLP/TTS) se realizan con `httpx` asíncrono para no bloquear el event loop y permitir mayor throughput por instancia, mejorando latencia bajo carga.
+- Logging: se implementó logging estructurado a consola, middleware de `x-request-id` para correlación, y (opcional) exportación a Application Insights cuando se define `APPLICATIONINSIGHTS_CONNECTIONSTRING`. Se añadieron handlers globales para devolver errores consistentes (422/500) y logs de excepción.
+
+### Ejemplo de consumo de la API
+```powershell
+curl -X POST "https://savanttest-ctf4a9cnabejamcf.canadacentral-01.azurewebsites.net/v1/voice" -H "accept: application/json" -H "Content-Type: multipart/form-data" -F "file=@C:\ruta\a\tu\audio.mp3;type=audio/mpeg"
+```
+Respuesta esperada (200):
+```json
+{
+  "transcription": "...",
+  "response_text": "...",
+  "audio_mime_type": "audio/mpeg",
+  "audio_b64": "..."
+}
+```
+
+### Documentación y Swagger
+- Local: http://localhost:8000/docs (Swagger) | http://localhost:8000/redoc
+- Producción: [Swagger](https://savanttest-ctf4a9cnabejamcf.canadacentral-01.azurewebsites.net/docs) [OpenAPI](https://savanttest-ctf4a9cnabejamcf.canadacentral-01.azurewebsites.net/redoc)
+
+
+
+## Próximos pasos para desplegar la solución real
+- Key Vault: externalizar y rotar secretos (claves y connection strings) con integración a identidades administradas; eliminar dependencia de `.env` en producción.
+- Autenticación/Autorización: proteger el frontend y el backend (por ejemplo, Azure AD/Entra ID o tokens firmados) para controlar acceso al endpoint `/v1/voice` y a la UI.
+- Azure Monitor avanzado: ampliar dashboards, alertas (métricas de latencia/errores), trazas end-to-end (FastAPI + llamadas externas), logging estructurado con propiedades personalizadas (request-id, usuario, tamaño de audio, etc.).
 
 ### Estructura de carpetas
 - `app/`
@@ -39,10 +77,13 @@ Variables principales por componente (usa valores propios):
 
 ### General (LLM)
 - `AZURE_OPENAI_API_KEY=<clave>`
-- `AZURE_INFERENCE_ENDPOINT=<url>` (opcional). Si está presente, se derivan `AZURE_OPENAI_ENDPOINT` y `AZURE_OPENAI_DEPLOYMENT`.
-- `AZURE_OPENAI_ENDPOINT=<url>` (opcional si no usas el anterior)
-- `AZURE_OPENAI_DEPLOYMENT=<nombre>` (opcional si no usas el anterior)
-- `LLM_MODEL=gpt-4o` (fallback de deployment), `LLM_TEMPERATURE=0.3`, `LLM_MAX_TOKENS=1024`
+- `AZURE_INFERENCE_ENDPOINT=<url-completo>`: URL de inferencia de Azure OpenAI que se usa como `azure_endpoint` en LangChain. Ejemplo:
+  `https://<resource>.cognitiveservices.azure.com/openai/deployments/<deployment>/chat/completions?api-version=2025-01-01-preview`
+- `AZURE_OPENAI_DEPLOYMENT=<nombre>` (opcional): nombre del deployment usado por LangChain (si procede).
+- `LLM_MODEL=gpt-4o` (opcional)
+- `LLM_TEMPERATURE=0.3` (opcional)
+- `LLM_MAX_TOKENS=1024` (opcional)
+- `PROMPTS_VERSION=v1` (opcional)
 
 ### ASR (Audio Transcriptions)
 - `AZURE_AUDIO_TRANSCRIBE_ENDPOINT=https://<resource>.cognitiveservices.azure.com/openai/deployments/<deployment>/audio/transcriptions?api-version=<ver>`
@@ -57,7 +98,7 @@ Variables principales por componente (usa valores propios):
 
 ### Observabilidad (opcional)
 - `APPLICATIONINSIGHTS_CONNECTIONSTRING=InstrumentationKey=...;IngestionEndpoint=...;...`
-  - Si está presente y el paquete está instalado, se configura Azure Monitor automáticamente.
+  - Si está presente y el paquete está instalado, se configura Azure Monitor (Application Insights) automáticamente.
 
 ## Ejecutar localmente
 1) Crea `.env` con tus valores.
@@ -68,10 +109,6 @@ python -m pip install -r requirements.txt
 python .\main.py
 ```
 
-Swagger/OpenAPI:
-- http://localhost:8000/docs
-- http://localhost:8000/redoc
-
 ## API
 ### GET `/health`
 Respuesta mínima para sondeo de estado:
@@ -81,7 +118,7 @@ Respuesta mínima para sondeo de estado:
 
 ### POST `/v1/voice`
 Multipart form-data:
-- `file` (audio `.wav` o `.mp3`)
+- `file` (audio `.wav`, `.mp3`)
 
 Ejemplo (PowerShell):
 ```powershell
@@ -105,7 +142,8 @@ Errores (ejemplos):
 
 Todas las respuestas incluyen la cabecera `x-request-id` para correlación en logs y Application Insights.
 
-> Nota: El endpoint devuelve audio en base64 por compatibilidad. Si prefieres streaming binario directo, se puede añadir como opción.
+UI de prueba (grabación en el navegador): abre `http://localhost:8000/` y usa los botones Start/Stop/Send. También disponible en `http://localhost:8000/frontend`.
+
 
 ## Pruebas
 Ejecuta la suite de tests con Python del entorno virtual:
@@ -124,22 +162,3 @@ docker run -p 8000:8000 --env-file .env voice-agent
 Workflow: `.github/workflows/main_savanttest.yml`
 - Buildx, login a ACR, `docker build-push`, y despliegue a Azure Web App (container) con `azure/webapps-deploy@v2`.
 - Requiere secretos configurados en el repositorio (credenciales de ACR y publish profile del Web App).
-
-## Solución de problemas
-- El servidor no arranca:
-  - Verifica que instalaste `requirements.txt` en el venv y que `.env` tiene claves y endpoints válidos.
-  - `python-multipart` es necesario para subir archivos.
-- ASR falla:
-  - Confirma `AZURE_AUDIO_TRANSCRIBE_*` (endpoint/model/key) y la `api-version` compatible.
-- LLM falla (401/403):
-  - Revisa `AZURE_OPENAI_*`, el deployment y permisos.
-- TTS falla:
-  - Confirma `AZURE_TTS_*` y la voz configurada. El servicio devuelve audio binario en `resp.content`.
-- Application Insights no recibe datos:
-  - Asegúrate de definir `APPLICATIONINSIGHTS_CONNECTIONSTRING` en el entorno del servicio (Azure App Service → Configuration).
-
-## Roadmap
-- Opción de respuesta binaria (streaming) para audio.
-- Detección de idioma y selección automática de voz.
-- Persistencia/URL para audio generado en lugar de base64.
-- Métricas y trazas adicionales (OpenTelemetry) y dashboards en App Insights.

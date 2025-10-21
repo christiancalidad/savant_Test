@@ -38,7 +38,7 @@ Process an uploaded audio file through ASR, NLP, and TTS, returning the transcri
         - Intended to be used as a FastAPI POST route handler at "/voice".
     """
     request_id = getattr(request.state, "request_id", "-")
-    if file.content_type not in {"audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3"}:
+    if file.content_type not in {"audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3", "audio/webm", "audio/ogg"}:
         logger.warning(f"Unsupported content type: {file.content_type} | request_id={request_id}")
         raise HTTPException(status_code=400, detail="Formato de audio no soportado")
 

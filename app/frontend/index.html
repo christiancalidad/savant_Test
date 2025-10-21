@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Agent Demo</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; color: #222; }
+    h1 { margin-top: 0; }
+    .row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    button { padding: .6rem 1rem; font-size: 1rem; cursor: pointer; }
+    .log { margin-top: 1rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; white-space: pre-wrap; background: #f6f8fa; padding: .75rem; border-radius: 6px; }
+    .panel { border: 1px solid #e5e7eb; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+    .label { font-weight: 600; }
+    audio { width: 100%; margin-top: .5rem; }
+    #spinner { display: none; }
+  </style>
+  <script defer src="/frontend/script.js"></script>
+  <script>
+    // Optional: set this to a relative base if served behind a path
+    window.API_BASE = ""; // same-origin
+  </script>
+</head>
+<body>
+  <h1>SAVANTVoice Agent Demo</h1>
+  <p>Graba audio desde tu navegador y recibe la respuesta sintetizada por el agente.</p>
+
+  <div class="panel">
+    <div class="row">
+      <button id="btnStart">Start recording</button>
+      <button id="btnStop" disabled>Stop</button>
+      <button id="btnSend" disabled>Send to /v1/voice</button>
+      <span id="status"></span>
+      <span id="spinner">⏳ Procesando…</span>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <div class="label">Original:</div>
+      <audio id="originalAudio" controls></audio>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="label">Respuesta del agente</div>
+    <div><span class="label">Transcripción:</span> <span id="transcription">—</span></div>
+    <div style="margin-top:.25rem"><span class="label">Texto generado:</span> <span id="responseText">—</span></div>
+    <audio id="replyAudio" controls></audio>
+  </div>
+
+  <div class="log" id="log"></div>
+</body>
+</html>

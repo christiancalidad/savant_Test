@@ -1,0 +1,77 @@
+<mxfile host="app.diagrams.net" modified="2025-10-21T00:00:00.000Z" agent="ChatGPT GPT-5" version="24.7.7" editor="draw.io">
+  <diagram name="Azure AI Architecture">
+    <mxGraphModel dx="1000" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- GitHub Actions -->
+        <mxCell id="github" value="GitHub Actions (CI/CD)" style="rounded=1;whiteSpace=wrap;fillColor=#24292E;fontColor=#FFFFFF;strokeColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="200" width="140" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- ACR -->
+        <mxCell id="acr" value="Azure Container Registry (ACR)" style="rounded=1;whiteSpace=wrap;fillColor=#007FFF;fontColor=#FFFFFF;strokeColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="200" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- App Service -->
+        <mxCell id="appservice" value="Azure App Service (Web App)" style="rounded=1;whiteSpace=wrap;fillColor=#0072C6;fontColor=#FFFFFF;strokeColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="200" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Application Insights -->
+        <mxCell id="insights" value="Azure Application Insights" style="rounded=1;whiteSpace=wrap;fillColor=#9B59B6;fontColor=#FFFFFF;strokeColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="740" y="200" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Azure AI Foundry -->
+        <mxCell id="foundry" value="Azure AI Foundry" style="rounded=1;whiteSpace=wrap;fillColor=#0078D4;fontColor=#FFFFFF;strokeColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="400" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- GPT Models inside Foundry -->
+        <mxCell id="gpt4o" value="GPT-4o" style="rounded=1;whiteSpace=wrap;fillColor=#E0E0E0;strokeColor=#888;" vertex="1" parent="1">
+          <mxGeometry x="740" y="380" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="gpt4o_transcribe" value="GPT-4o-mini-transcribe" style="rounded=1;whiteSpace=wrap;fillColor=#E0E0E0;strokeColor=#888;" vertex="1" parent="1">
+          <mxGeometry x="740" y="430" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="gpt4o_tts" value="GPT-4o-mini-tts" style="rounded=1;whiteSpace=wrap;fillColor=#E0E0E0;strokeColor=#888;" vertex="1" parent="1">
+          <mxGeometry x="740" y="480" width="140" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- User -->
+        <mxCell id="users" value="End Users / Clients" style="rounded=1;whiteSpace=wrap;fillColor=#CCCCCC;strokeColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="40" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Connections -->
+        <mxCell id="e1" edge="1" source="github" target="acr" style="endArrow=block;strokeWidth=2;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" edge="1" source="acr" target="appservice" style="endArrow=block;strokeWidth=2;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" edge="1" source="appservice" target="insights" style="endArrow=block;strokeWidth=2;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" edge="1" source="appservice" target="foundry" style="endArrow=block;strokeWidth=2;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" edge="1" source="users" target="appservice" style="endArrow=block;strokeWidth=2;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" edge="1" source="foundry" target="gpt4o" style="endArrow=block;dashed=1;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" edge="1" source="foundry" target="gpt4o_transcribe" style="endArrow=block;dashed=1;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" edge="1" source="foundry" target="gpt4o_tts" style="endArrow=block;dashed=1;" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
