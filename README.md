@@ -21,14 +21,20 @@ Audio (.wav/.mp3) → [ASR REST] → Texto → [LLM LangChain + Azure OpenAI] �
 
 
 ## Decisiones y justificación
-- 3 modelos (ASR, LLM, TTS): se eligió separar las capacidades para demostrar la integración de cada servicio de Azure (transcripción, generación y síntesis). Alternativamente, se podría simplificar con un único modelo multimodal (p. ej., GPT-4o) que procese audio de entrada y devuelva texto/audio, reduciendo latencia y complejidad operativa, a costa de menor control por etapa.
-- Docker + GitHub Actions: se usan para garantizar CI/CD reproducible. La imagen se construye siempre igual localmente y en el pipeline, y se despliega a Azure App Service (contenedor) desde ACR.
-- Ecosistema Azure: se aprovecha Azure OpenAI/Audio (Azure AI Foundry) para cumplir con requisitos de seguridad y cumplimiento, integración nativa con redes privadas, identidades administradas y observabilidad (Application Insights).
-- Endpoint `/health`: permite monitoreo básico de liveness en App Service o probes externos. Responde `{ "status": "ok" }` con baja latencia.
-- Pruebas unitarias: existen tests mínimos (salud y flujo de voz con stub) para verificar que la aplicación arranca y que el endpoint principal responde con el contrato esperado. Se pueden ampliar con casos de error, límites y contratos por servicio.
-- Pydantic (pydantic-settings): centraliza la configuración por variables de entorno, con tipos por campo y validaciones simples, facilitando cambios entre entornos sin modificar código.
-- Funciones asíncronas: las llamadas a servicios externos (ASR/NLP/TTS) se realizan con `httpx` asíncrono para no bloquear el event loop y permitir mayor throughput por instancia, mejorando latencia bajo carga.
-- Logging: se implementó logging estructurado a consola, middleware de `x-request-id` para correlación, y (opcional) exportación a Application Insights cuando se define `APPLICATIONINSIGHTS_CONNECTIONSTRING`. Se añadieron handlers globales para devolver errores consistentes (422/500) y logs de excepción.
+- **3 modelos (ASR, LLM, TTS):** se eligió separar las capacidades para demostrar la integración de cada servicio de Azure (transcripción, generación y síntesis). Alternativamente, se podría simplificar con un único modelo multimodal (p. ej., GPT-4o) que procese audio de entrada y devuelva texto/audio, reduciendo latencia y complejidad operativa, a costa de menor control por etapa.
+- **Docker + GitHub Actions:** se usan para garantizar CI/CD reproducible. La imagen se construye siempre igual localmente y en el pipeline, y se despliega a Azure App Service (contenedor) desde ACR.
+- **Ecosistema Azure:** se usa Azure OpenAI/Audio (Azure AI Foundry) para cumplir con requisitos de seguridad y cumplimiento, integración nativa con redes privadas, identidades administradas y observabilidad (Application Insights).
+- **Endpoint `/health`:** permite monitoreo básico de liveness en App Service. Responde `{ "status": "ok" }` con baja latencia.
+- **Pruebas unitarias:** existen tests mínimos (salud y flujo de voz con stub) para verificar que la aplicación arranca y que el endpoint principal responde con el contrato esperado.
+- **Pydantic (pydantic-settings):** centraliza la configuración por variables de entorno, con tipos por campo y validaciones simples, facilitando cambios entre entornos sin modificar código.
+- **Funciones asíncronas:** las llamadas a servicios externos (ASR/NLP/TTS) se realizan con `httpx` asíncrono para no bloquear el event loop y mejorar latencia bajo carga.
+- **Logging:** se implementó logging estructurado a consola, middleware de `x-request-id` para correlación, y  registro en Application Insight. Se añadieron handlers globales para devolver errores consistentes (422/500) y logs de excepción.
+
+## Próximos pasos para desplegar la solución real
+- **Key Vault:** Almacenar y rotar secretos (claves y connection strings) para garantizar la seguridad de la información.
+- **Autenticación/Autorización:** proteger el frontend y el backend (por ejemplo, Azure AD/Entra ID o tokens) para controlar acceso al endpoint `/v1/voice` y a la UI.
+- **Azure Monitor avanzado**: contar con dashboards, alertas (métricas de latencia/errores), trazas end-to-end (FastAPI + llamadas externas).
+
 
 ### Ejemplo de consumo de la API
 ```powershell
@@ -50,10 +56,6 @@ Respuesta esperada (200):
 
 
 
-## Próximos pasos para desplegar la solución real
-- Key Vault: externalizar y rotar secretos (claves y connection strings) con integración a identidades administradas; eliminar dependencia de `.env` en producción.
-- Autenticación/Autorización: proteger el frontend y el backend (por ejemplo, Azure AD/Entra ID o tokens firmados) para controlar acceso al endpoint `/v1/voice` y a la UI.
-- Azure Monitor avanzado: ampliar dashboards, alertas (métricas de latencia/errores), trazas end-to-end (FastAPI + llamadas externas), logging estructurado con propiedades personalizadas (request-id, usuario, tamaño de audio, etc.).
 
 ### Estructura de carpetas
 - `app/`
@@ -96,9 +98,9 @@ Variables principales por componente (usa valores propios):
 - `AZURE_TTS_API_KEY=<clave>` (si falta, se reutiliza `AZURE_OPENAI_API_KEY`)
 - `TTS_VOICE=alloy`
 
-### Observabilidad (opcional)
+### Observabilidad
 - `APPLICATIONINSIGHTS_CONNECTIONSTRING=InstrumentationKey=...;IngestionEndpoint=...;...`
-  - Si está presente y el paquete está instalado, se configura Azure Monitor (Application Insights) automáticamente.
+  - Se configura Azure Monitor (Application Insights) automáticamente.
 
 ## Ejecutar localmente
 1) Crea `.env` con tus valores.
@@ -146,7 +148,7 @@ UI de prueba (grabación en el navegador): abre `http://localhost:8000/` y usa l
 
 
 ## Pruebas
-Ejecuta la suite de tests con Python del entorno virtual:
+Ejecuta los tests con Python del entorno virtual:
 ```powershell
 .venv\Scripts\python.exe -m pytest -q
 ```
