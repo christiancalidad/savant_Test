@@ -44,13 +44,11 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
 
     try:
         async with httpx.AsyncClient(timeout=60) as client:
-            print(endpoint, headers, payload)
             resp = await client.post(endpoint, headers=headers, json=payload)
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as http_err:
             # Log server's error body to aid debugging (e.g., invalid voice, bad api-version)
-            print(http_err)
             body_text = http_err.response.text if http_err.response is not None else "<no body>"
             logger.error(
                 "TTS HTTP %s: %s | url=%s | body=%s",
