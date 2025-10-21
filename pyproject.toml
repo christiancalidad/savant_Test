@@ -1,0 +1,22 @@
+[project]
+name = "voice-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "azure-monitor-opentelemetry>=1.8.1",
+    "fastapi>=0.119.1",
+    "httpx>=0.28.1",
+    "langchain>=1.0.1",
+    "langchain-openai>=1.0.0",
+    "opentelemetry-sdk>=1.38.0",
+    "pydantic-settings>=2.11.0",
+    "pydub>=0.25.1",
+    "pytest>=8.4.2",
+    "python-dotenv>=1.1.1",
+    "python-multipart>=0.0.20",
+    "scipy>=1.16.2",
+    "sounddevice>=0.5.3",
+    "uvicorn[standard]>=0.38.0",
+]

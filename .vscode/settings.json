@@ -1,0 +1,11 @@
+{
+    // Ensure VS Code uses the project's virtual environment for running Python files
+    "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+    // Auto-activate the environment in integrated terminals
+    "python.terminal.activateEnvironment": true,
+    // Load environment variables from .env when running/debugging
+    "python.envFile": "${workspaceFolder}\\.env",
+
+    // Existing settings
+    "postman.settings.dotenv-detection-notification-visibility": false
+}

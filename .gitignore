@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.build/
+.eggs/
+*.egg-info/
+.venv/
+.env
+.env.*
+venv/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.ipynb
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data and logs
+/data/
+/logs/
+
+# Docker
+.dockerignore
+Dockerfile*
+
+# Node (if present)
+node_modules/
+
+# Test artifacts
+junit.xml
+coverage.xml
+
+# Misc
+*.log
+*.tmp

@@ -1,0 +1,11 @@
+python-dotenv==1.1.1
+fastapi==0.119.1
+uvicorn[standard]==0.38.0
+pytest==8.4.2
+pydantic-settings==2.11.0
+langchain==1.0.1
+langchain-openai==1.0.0
+opentelemetry-sdk==1.38.0
+azure-monitor-opentelemetry==1.8.1
+httpx==0.28.1
+python-multipart==0.0.20
