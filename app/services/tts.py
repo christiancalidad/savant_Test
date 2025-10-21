@@ -32,23 +32,18 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
     api_key = settings.azure_tts_api_key
     voice = settings.tts_voice or "alloy"
 
-    if not endpoint or not api_key:
-        raise RuntimeError("Azure TTS endpoint or API key not configured")
-
     # Azure OpenAI Audio Speech expects API key in 'api-key' header and an Accept for desired audio format
     headers = {
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-        "api-key": api_key,
+        "Authorization": f"Bearer {api_key}",
     }
+
     payload = {
         "model": model,
         "input": text,
-        "voice": voice,
-        # Some Azure deployments also accept an explicit output format hint
-        "format": "mp3",
+        "voice": voice
     }
 
+    logger.info("Sending TTS request...", extra={"endpoint": endpoint, "model": model, "voice": voice})
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(endpoint, headers=headers, json=payload)
@@ -67,6 +62,7 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
             raise
 
         audio_bytes = resp.content
+        logger.info("TTS synthesis succeeded", extra={"bytes": len(audio_bytes)})
         mime = resp.headers.get("Content-Type", "audio/mpeg")
         b64 = base64.b64encode(audio_bytes).decode("utf-8")
         return (mime, b64)
