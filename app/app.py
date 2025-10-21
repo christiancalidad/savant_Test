@@ -24,15 +24,36 @@ except Exception:  # pragma: no cover - optional dependency at runtime
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 logger = logging.getLogger("app")
 
-# Initialize Azure Monitor (Application Insights) if configured
-if settings.application_insights_connection_string and configure_azure_monitor:
-    try:
-        configure_azure_monitor(connection_string=settings.application_insights_connection_string)
-        logger.info("Azure Monitor configured for Application Insights logging and tracing")
-    except Exception as exc:  # don't block app startup on telemetry issues
-        logger.warning(f"Failed to configure Azure Monitor: {exc}")
+# Initialize Azure Monitor (Application Insights)
+# In local/dev, suppress telemetry setup and quiet chatty SDK loggers so only app logs/prints show.
+if settings.environment.lower() != "praoduction":
+    # Do NOT configure Azure Monitor in local/dev even if connection string exists
+    logger.info("Local/dev environment detected: telemetry disabled, showing only app logs/prints")
+    # Quiet down telemetry/HTTP SDKs in local
+    for noisy in (
+        "azure",
+        "azure.core",
+        "azure.core.pipeline.policies.http_logging_policy",
+        "azure.monitor",
+        "azure.monitor.opentelemetry",
+        "opentelemetry",
+        "httpx",
+        "urllib3",
+    ):
+        try:
+            logging.getLogger(noisy).setLevel(logging.WARNING)
+        except Exception:
+            pass
 else:
-    logger.info("Azure Monitor not configured (no connection string or package not available)")
+    # Production: configure Azure Monitor when available
+    if settings.application_insights_connection_string and configure_azure_monitor:
+        try:
+            configure_azure_monitor(connection_string=settings.application_insights_connection_string)
+            logger.info("Azure Monitor configured for Application Insights logging and tracing")
+        except Exception as exc:  # don't block app startup on telemetry issues
+            logger.warning(f"Failed to configure Azure Monitor: {exc}")
+    else:
+        logger.info("Azure Monitor not configured (no connection string or package not available)")
 
 app = FastAPI(title=settings.app_name)
 

@@ -41,11 +41,10 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
         "input": text,
         "voice": voice
     }
-    logger.debug("Preparing TTS request...", extra={"endpoint": endpoint, "model": model, "voice": voice})
+
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(endpoint, headers=headers, json=payload)
-            logger.debug("TTS response received", extra={"status_code": resp.status_code})
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as http_err:
