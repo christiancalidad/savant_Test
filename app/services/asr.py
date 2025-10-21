@@ -6,10 +6,34 @@ from app.config import settings
 
 async def transcribe_audio(file_path: str) -> Tuple[str, str]:
     """
-    Transcribe audio calling Azure Audio Transcriptions REST endpoint directly.
-    Returns (transcription, language_code).
-    Falls back to a stub when config is missing.
+    Transcribe an audio file asynchronously using an Azure-compatible transcription endpoint.
+    This function uploads the audio as multipart/form-data with the provided model and
+    extracts the transcription from common response shapes.
+    Parameters:
+    - file_path: Path to the local audio file to transcribe. The MIME type is inferred via
+        mimetypes.guess_type and defaults to "audio/wav" when unknown.
+    Returns:
+    - (text, lang): A tuple where:
+        - text: The transcribed text. If the API returns no text, the placeholder
+            "(transcripción vacía)" is used. On error, "Error".
+        - lang: BCP-47 language tag of the transcription. Currently always "en-US".
+            On error, "Error".
+    Behavior:
+    - Sends a POST request to the configured endpoint with Authorization: Bearer <api_key>.
+    - Multipart form fields: "model" (string) and "file" (the audio content).
+    - Parses JSON response, preferring "text", then falling back to choices[0].message.content.
+    - Trims surrounding whitespace from the resulting transcription.
+    Error handling:
+    - Any exception (file I/O, network issues, non-2xx status, JSON parsing) results in
+        a return value of ("Error", "Error") instead of raising.
+    Notes:
+    - Uses httpx.AsyncClient with a 60-second timeout.
+    - Requires configured settings:
+        - settings.azure_audio_transcribe_endpoint
+        - settings.azure_audio_transcribe_model
+        - settings.azure_audio_api_key
     """
+
     endpoint = settings.azure_audio_transcribe_endpoint
     model = settings.azure_audio_transcribe_model
     api_key = settings.azure_audio_api_key
@@ -46,7 +70,6 @@ async def transcribe_audio(file_path: str) -> Tuple[str, str]:
         if not transcription:
             transcription = "(transcripción vacía)"
 
-        # Idioma: si el servicio no lo devuelve, asumir inglés
         lang = "en-US"
         return (transcription, lang)
     except Exception:

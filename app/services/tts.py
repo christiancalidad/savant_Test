@@ -1,15 +1,30 @@
 import base64
-from typing import Optional
 import httpx
 
 from app.config import settings
 
 
-async def synthesize_speech(text: str, language: str = "es-ES") -> tuple[str, str]:
+async def synthesize_speech(text: str) -> tuple[str, str]:
     """
-    Llama al endpoint de Azure TTS (audio/speech) y retorna (mime_type, audio_base64).
-    Si faltan variables, retorna un WAV de silencio para no romper el flujo.
+    Asynchronously synthesize speech audio from text using a configured Azure-compatible TTS API.
+    Args:
+        text: The text to convert to speech.
+    Returns:
+        A tuple (mime_type, audio_base64):
+        - mime_type: The audio MIME type reported by the service (defaults to "audio/mpeg").
+        - audio_base64: The audio content encoded in Base64.
+    Behavior:
+        - Sends a JSON POST request to the configured TTS endpoint with the model and voice.
+        - On HTTP success, returns the service's audio bytes as Base64 along with the response Content-Type.
+        - On any error (e.g., non-2xx status, network/timeout issues), returns a 1-second silent WAV
+          (8000 Hz) encoded as Base64 with MIME type "audio/wav".
+    Notes:
+        - Uses a 60-second HTTP client timeout.
+        - Voice is taken from settings (fallback "alloy"). Model, endpoint, and API key are also read from settings.
+    Example:
+        mime, audio_b64 = await synthesize_speech("Hello world")
     """
+
     endpoint = settings.azure_tts_endpoint
     model = settings.azure_tts_model
     api_key = settings.azure_tts_api_key
@@ -29,8 +44,6 @@ async def synthesize_speech(text: str, language: str = "es-ES") -> tuple[str, st
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(endpoint, headers=headers, json=payload)
         resp.raise_for_status()
-        # La API de TTS puede devolver audio binario o un JSON con data.
-        # Según el ejemplo, asumimos audio binario directo.
         audio_bytes = resp.content
         mime = resp.headers.get("Content-Type", "audio/mpeg")
         b64 = base64.b64encode(audio_bytes).decode("utf-8")

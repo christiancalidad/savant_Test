@@ -7,7 +7,9 @@ client = TestClient(app)
 
 
 def test_voice_with_fixture_file_mp3():
-    # Use a real audio file from test_recordings
+    """Ensure the voice endpoint accepts the fixture MP3 file, skipping if absent, and returns the expected transcription, 
+    response text, audio MIME type, and base64-encoded audio."""
+    
     project_root = Path(__file__).resolve().parents[1]
     audio_path = project_root / "test_recordings" / "test1.mp3"
 

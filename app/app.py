@@ -5,7 +5,7 @@ from app.config import settings
 
 app = FastAPI(title=settings.app_name)
 
-
+# CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
