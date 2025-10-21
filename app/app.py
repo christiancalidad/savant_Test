@@ -25,10 +25,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(nam
 logger = logging.getLogger("app")
 
 # Initialize Azure Monitor (Application Insights)
-# In local/dev, suppress telemetry setup and quiet chatty SDK loggers so only app logs/prints show.
-if settings.environment.lower() != "praoduction":
+# In local/dev, or when telemetry is disabled, suppress telemetry setup
+if settings.environment.lower() != "production" or not getattr(settings, "telemetry_enabled", True):
     # Do NOT configure Azure Monitor in local/dev even if connection string exists
-    logger.info("Local/dev environment detected: telemetry disabled, showing only app logs/prints")
+    logger.info("Telemetry disabled (env!=production or TELEMETRY_ENABLED=false): showing only app logs/prints")
     # Quiet down telemetry/HTTP SDKs in local
     for noisy in (
         "azure",

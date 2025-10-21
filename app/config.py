@@ -41,6 +41,11 @@ class Settings(BaseSettings):
         validation_alias="APPLICATIONINSIGHTS_CONNECTIONSTRING",
         description="Azure Application Insights connection string",
     )
+    telemetry_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("TELEMETRY_ENABLED", "APPLICATION_INSIGHTS_ENABLED"),
+        description="Enable Azure Monitor/OpenTelemetry exporters when true.",
+    )
 
     class Config:
         env_file = ".env"
