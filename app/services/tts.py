@@ -18,8 +18,7 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
     Behavior:
         - Sends a JSON POST request to the configured TTS endpoint with the model and voice.
         - On HTTP success, returns the service's audio bytes as Base64 along with the response Content-Type.
-        - On any error (e.g., non-2xx status, network/timeout issues), returns a 1-second silent WAV
-          (8000 Hz) encoded as Base64 with MIME type "audio/wav".
+        - On any error (e.g., non-2xx status, network/timeout issues), raises a RuntimeError so the caller can surface the error.
     Notes:
         - Uses a 60-second HTTP client timeout.
         - Voice is taken from settings (fallback "alloy"). Model, endpoint, and API key are also read from settings.
@@ -42,11 +41,11 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
         "input": text,
         "voice": voice
     }
-
-    logger.info("Sending TTS request...", extra={"endpoint": endpoint, "model": model, "voice": voice})
+    logger.debug("Preparing TTS request...", extra={"endpoint": endpoint, "model": model, "voice": voice})
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(endpoint, headers=headers, json=payload)
+            logger.debug("TTS response received", extra={"status_code": resp.status_code})
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as http_err:
@@ -60,7 +59,7 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
                 body_text[:2000],
             )
             raise
-
+        
         audio_bytes = resp.content
         logger.info("TTS synthesis succeeded", extra={"bytes": len(audio_bytes)})
         mime = resp.headers.get("Content-Type", "audio/mpeg")
@@ -68,28 +67,6 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
         return (mime, b64)
     except Exception as exc:
         logger.exception(f"TTS synthesis failed: {exc}")
-        # Fallback: return 1-second silence to keep pipeline resilient
-        try:
-            silence = _generate_silence_wav(1)
-            return ("audio/wav", base64.b64encode(silence).decode("utf-8"))
-        except Exception:
-            # If even silence generation fails, re-raise original error
-            raise RuntimeError("TTS synthesis failed") from exc
-
-
-def _generate_silence_wav(seconds: int, sample_rate: int = 8000) -> bytes:
-    import io
-    import wave
-    import struct
-
-    n_frames = seconds * sample_rate
-    buffer = io.BytesIO()
-    with wave.open(buffer, "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)  # 16-bit
-        wf.setframerate(sample_rate)
-        silence_frame = struct.pack('<h', 0)
-        for _ in range(n_frames):
-            wf.writeframesraw(silence_frame)
-    return buffer.getvalue()
+        # Do not generate silence; surface the error to the caller
+        raise RuntimeError("TTS synthesis failed") from exc
 
