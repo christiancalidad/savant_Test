@@ -1,130 +1,145 @@
-Voice Agent (ASR → LLM → TTS)
+## Voice Agent (ASR → LLM → TTS)
 
 Servicio FastAPI que recibe audio (.wav/.mp3), lo transcribe (ASR directo a Azure), analiza el texto con un LLM (LangChain + Azure OpenAI) y devuelve audio sintetizado (TTS con Azure), junto con un JSON con la transcripción y la respuesta textual.
 
-Características
+### Características
 - ASR: consumo directo del endpoint de Azure OpenAI Audio Transcriptions (multipart: model + file).
 - NLP: LangChain con `AzureChatOpenAI` (deployment configurable).
 - TTS: consumo directo del endpoint de Azure OpenAI Audio Speech (JSON body: model, input, voice).
+- Observabilidad: logging estructurado, `x-request-id` en todas las respuestas, y soporte opcional para Application Insights (Azure Monitor).
+- Manejo de errores: respuestas consistentes con `{"detail": "..."}` y códigos HTTP 4xx/5xx apropiados.
 - FastAPI con OpenAPI/Swagger.
 - Dockerfile para contenedorización.
-- CI básico con GitHub Actions (instala deps, corre tests, valida build Docker).
-- Plantillas de despliegue: Render, Railway, Fly.io.
+- CI/CD: workflow de GitHub Actions para construir y desplegar contenedor a Azure Web App (container).
 
-Estructura
-- app/
-	- app.py — FastAPI app, CORS y health
-	- config.py — Variables de entorno (pydantic-settings) y derivaciones útiles
-	- routers/voice.py — Endpoint POST /v1/voice
-	- services/
-		- asr.py — Llama a Azure Audio Transcriptions (REST)
-		- nlp.py — LLM con LangChain + AzureChatOpenAI
-		- tts.py — Llama a Azure Audio Speech (REST)
-- tests/ — Pruebas (health y flujo de voz con stub)
-- .github/workflows/ci.yml — Pipeline CI
-- Dockerfile, .dockerignore — Contenedor listo
-- render.yaml, railway.json, fly.toml — Despliegue
+### Arquitectura (alto nivel)
+```
+Audio (.wav/.mp3) → [ASR REST] → Texto → [LLM LangChain + Azure OpenAI] → Respuesta texto → [TTS REST] → Audio (base64)
+```
 
-Requisitos
+### Estructura de carpetas
+- `app/`
+  - `app.py` — App FastAPI, CORS, health, request-id middleware, handlers globales.
+  - `config.py` — Variables de entorno (pydantic-settings).
+  - `routers/voice.py` — Endpoint POST `/v1/voice` (pipeline ASR → LLM → TTS).
+  - `services/`
+    - `asr.py` — Azure Audio Transcriptions (REST, multipart).
+    - `nlp.py` — LLM con LangChain + AzureChatOpenAI.
+    - `tts.py` — Azure Audio Speech (REST, binario → base64).
+- `tests/` — Pruebas (salud y flujo de voz con stub).
+- `.github/workflows/main_savanttest.yml` — Build+Push a ACR y deploy a Azure Web App container.
+- `Dockerfile` — Imagen lista para producción.
+
+### Requisitos
 - Python 3.11+
-- Variables de entorno en `.env` (ver sección siguiente)
+- Variables de entorno en `.env` (no lo subas al repo)
 
-Variables de entorno
-Config mínimas para cada componente (no subas `.env` al repo):
+## Configuración (.env)
+Variables principales por componente (usa valores propios):
 
-- General LLM (LangChain + Azure OpenAI)
-	- AZURE_OPENAI_API_KEY
-	- AZURE_INFERENCE_ENDPOINT — opcional; si está presente, se deriva `AZURE_OPENAI_ENDPOINT` y `AZURE_OPENAI_DEPLOYMENT` automáticamente.
-	- AZURE_OPENAI_ENDPOINT — opcional (si no usas `AZURE_INFERENCE_ENDPOINT`)
-	- AZURE_OPENAI_DEPLOYMENT — opcional (si no usas `AZURE_INFERENCE_ENDPOINT`)
-	- LLM_MODEL — opcional; si no hay deployment, se usa como tal
-	- LLM_TEMPERATURE — por defecto 0.3
-	- LLM_MAX_TOKENS — por defecto 1024
+### General (LLM)
+- `AZURE_OPENAI_API_KEY=<clave>`
+- `AZURE_INFERENCE_ENDPOINT=<url>` (opcional). Si está presente, se derivan `AZURE_OPENAI_ENDPOINT` y `AZURE_OPENAI_DEPLOYMENT`.
+- `AZURE_OPENAI_ENDPOINT=<url>` (opcional si no usas el anterior)
+- `AZURE_OPENAI_DEPLOYMENT=<nombre>` (opcional si no usas el anterior)
+- `LLM_MODEL=gpt-4o` (fallback de deployment), `LLM_TEMPERATURE=0.3`, `LLM_MAX_TOKENS=1024`
 
-- ASR (Azure Audio Transcriptions)
-	- AZURE_AUDIO_TRANSCRIBE_ENDPOINT (ej.: https://<resource>.cognitiveservices.azure.com/openai/deployments/<deployment>/audio/transcriptions?api-version=2025-03-01-preview)
-	- AZURE_AUDIO_TRANSCRIBE_MODEL (ej.: gpt-4o-mini-transcribe) — si falta, se infiere del endpoint
-	- AZURE_AUDIO_API_KEY — si falta, se reutiliza `AZURE_OPENAI_API_KEY`
+### ASR (Audio Transcriptions)
+- `AZURE_AUDIO_TRANSCRIBE_ENDPOINT=https://<resource>.cognitiveservices.azure.com/openai/deployments/<deployment>/audio/transcriptions?api-version=<ver>`
+- `AZURE_AUDIO_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe`
+- `AZURE_AUDIO_API_KEY=<clave>` (si falta, se reutiliza `AZURE_OPENAI_API_KEY`)
 
-- TTS (Azure Audio Speech)
-	- AZURE_TTS_ENDPOINT (ej.: https://<resource>.cognitiveservices.azure.com/openai/deployments/<deployment>/audio/speech?api-version=2025-03-01-preview)
-	- AZURE_TTS_MODEL (ej.: gpt-4o-mini-tts) — si falta, se infiere del endpoint
-	- AZURE_TTS_API_KEY — si falta, se reutiliza `AZURE_OPENAI_API_KEY`
-	- TTS_VOICE (ej.: alloy)
+### TTS (Audio Speech)
+- `AZURE_TTS_ENDPOINT=https://<resource>.cognitiveservices.azure.com/openai/deployments/<deployment>/audio/speech?api-version=<ver>`
+- `AZURE_TTS_MODEL=gpt-4o-mini-tts`
+- `AZURE_TTS_API_KEY=<clave>` (si falta, se reutiliza `AZURE_OPENAI_API_KEY`)
+- `TTS_VOICE=alloy`
 
-- Observabilidad (opcional)
-	- AZURE_TRACING_GEN_AI_CONTENT_RECORDING_ENABLED=true|false
-	- APPLICATION_INSIGHTS_CONNECTION_STRING=<connection-string>
+### Observabilidad (opcional)
+- `APPLICATIONINSIGHTS_CONNECTIONSTRING=InstrumentationKey=...;IngestionEndpoint=...;...`
+  - Si está presente y el paquete está instalado, se configura Azure Monitor automáticamente.
 
-Instalación y ejecución local
-1) Crear `.env` con tus valores.
-2) Instalar dependencias y ejecutar el servidor:
+## Ejecutar localmente
+1) Crea `.env` con tus valores.
+2) Instala dependencias y arranca el servidor:
 
 ```powershell
 python -m pip install -r requirements.txt
 python .\main.py
 ```
 
-3) OpenAPI/Swagger:
+Swagger/OpenAPI:
 - http://localhost:8000/docs
 - http://localhost:8000/redoc
 
-Uso del endpoint
-- POST /v1/voice (multipart/form-data)
-	- file: archivo de audio (.wav o .mp3)
-
-Ejemplo con PowerShell (cambia la ruta del archivo):
-```powershell
-curl -X POST "http://localhost:8000/v1/voice" -H "accept: application/json" -H "Content-Type: multipart/form-data" -F "file=@C:\Users\chris\OneDrive\Escritorio\GenAI\savant_test\savant_Test\test_recordings\test1.mp3;type=audio/mpeg"
+## API
+### GET `/health`
+Respuesta mínima para sondeo de estado:
+```json
+{"status": "ok"}
 ```
 
-Respuesta (JSON):
+### POST `/v1/voice`
+Multipart form-data:
+- `file` (audio `.wav` o `.mp3`)
+
+Ejemplo (PowerShell):
+```powershell
+curl -X POST "http://localhost:8000/v1/voice" -H "accept: application/json" -H "Content-Type: multipart/form-data" -F "file=@C:\ruta\a\tu\audio.mp3;type=audio/mpeg"
+```
+
+Respuesta (200):
 ```json
 {
-	"transcription": "...",
-	"response_text": "...",
-	"audio_mime_type": "audio/mpeg",
-	"audio_b64": "..."
+  "transcription": "...",
+  "response_text": "...",
+  "audio_mime_type": "audio/mpeg",
+  "audio_b64": "..."
 }
 ```
 
-Nota sobre audio binario
-- Actualmente el endpoint devuelve JSON con `audio_b64` para máxima compatibilidad (Swagger, clientes HTTP). Si prefieres respuesta binaria (streaming) podemos añadir un flag de query (por ejemplo `?as_binary=true`) o un endpoint alterno. Dímelo y lo activo.
+Errores (ejemplos):
+- 400: `{"detail":"Formato de audio no soportado"}`
+- 422: `{"detail":"Solicitud inválida: datos no válidos"}`
+- 502: `{"detail":"Error procesando audio o generando respuesta"}`
 
-Tests
-- Ejecuta pruebas con:
+Todas las respuestas incluyen la cabecera `x-request-id` para correlación en logs y Application Insights.
+
+> Nota: El endpoint devuelve audio en base64 por compatibilidad. Si prefieres streaming binario directo, se puede añadir como opción.
+
+## Pruebas
+Ejecuta la suite de tests con Python del entorno virtual:
 ```powershell
-pytest -q
+.venv\Scripts\python.exe -m pytest -q
 ```
 
-Docker
-- Construir y ejecutar:
+## Docker
+Construcción y ejecución local:
 ```powershell
 docker build -t voice-agent .
 docker run -p 8000:8000 --env-file .env voice-agent
 ```
 
-CI/CD
-- GitHub Actions: `.github/workflows/ci.yml` instala dependencias, corre tests y construye imagen Docker.
+## CI/CD (Azure Web App – contenedor)
+Workflow: `.github/workflows/main_savanttest.yml`
+- Buildx, login a ACR, `docker build-push`, y despliegue a Azure Web App (container) con `azure/webapps-deploy@v2`.
+- Requiere secretos configurados en el repositorio (credenciales de ACR y publish profile del Web App).
 
-Despliegue
-- Render: `render.yaml`
-- Railway: `railway.json`
-- Fly.io: `fly.toml`
-
-Solución de problemas
+## Solución de problemas
 - El servidor no arranca:
-	- Verifica que `requirements.txt` esté instalado en tu venv y que `.env` contenga claves y endpoints válidos.
-	- Asegúrate de tener `python-multipart` instalado (incluido en requirements) para subir archivos.
-- La transcripción es vacía o error:
-	- Revisa `AZURE_AUDIO_TRANSCRIBE_ENDPOINT`, `AZURE_AUDIO_TRANSCRIBE_MODEL` y `AZURE_AUDIO_API_KEY`.
-	- Valida que el deployment soporta transcripción de audio y la `api-version` sea correcta.
-- El TTS falla o devuelve silencio:
-	- Revisa `AZURE_TTS_ENDPOINT`, `AZURE_TTS_MODEL`, `AZURE_TTS_API_KEY` y `TTS_VOICE`.
-	- El servicio devuelve audio binario; si cambia a JSON con campos de audio, hay que ajustar el parser.
+  - Verifica que instalaste `requirements.txt` en el venv y que `.env` tiene claves y endpoints válidos.
+  - `python-multipart` es necesario para subir archivos.
+- ASR falla:
+  - Confirma `AZURE_AUDIO_TRANSCRIBE_*` (endpoint/model/key) y la `api-version` compatible.
+- LLM falla (401/403):
+  - Revisa `AZURE_OPENAI_*`, el deployment y permisos.
+- TTS falla:
+  - Confirma `AZURE_TTS_*` y la voz configurada. El servicio devuelve audio binario en `resp.content`.
+- Application Insights no recibe datos:
+  - Asegúrate de definir `APPLICATIONINSIGHTS_CONNECTIONSTRING` en el entorno del servicio (Azure App Service → Configuration).
 
-Roadmap corto
-- Opción de respuesta binaria nativa del endpoint (streaming) y descarga con extensión.
-- Detección de idioma ASR y selección automática de voz TTS.
-- Persistencia opcional del audio generado (URL en lugar de base64).
-- Integración de OpenTelemetry (trazas/metricas) con Application Insights.
+## Roadmap
+- Opción de respuesta binaria (streaming) para audio.
+- Detección de idioma y selección automática de voz.
+- Persistencia/URL para audio generado en lugar de base64.
+- Métricas y trazas adicionales (OpenTelemetry) y dashboards en App Insights.
