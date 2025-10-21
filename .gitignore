@@ -31,7 +31,6 @@ Thumbs.db
 
 # Docker
 .dockerignore
-Dockerfile*
 
 # Node (if present)
 node_modules/
