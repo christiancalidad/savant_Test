@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 
 try:
     from langchain_openai import AzureChatOpenAI  
@@ -6,6 +7,7 @@ except Exception:
     AzureChatOpenAI = None 
 
 from app.config import settings
+logger = logging.getLogger("app.nlp")
 
 
 async def generate_response(prompt: str) -> str:
@@ -35,22 +37,26 @@ async def generate_response(prompt: str) -> str:
         'París.'
     """
 
-    llm = AzureChatOpenAI(
-        azure_deployment=settings.azure_openai_deployment,
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_key=settings.azure_openai_api_key,
-        api_version=settings.azure_openai_api_version,
-        temperature=0.3,
-    )
+    try:
+        llm = AzureChatOpenAI(
+            azure_deployment=settings.azure_openai_deployment,
+            azure_endpoint=settings.azure_openai_endpoint,
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
+            temperature=0.3,
+        )
 
-    # Minimal single-turn prompt
-    sys_prompt = (
-        "Eres un asistente que responde preguntas sobre cualquier tema. Responde brevemente en el idioma del usuario."
-    )
+        # Minimal single-turn prompt
+        sys_prompt = (
+            "Eres un asistente que responde preguntas sobre cualquier tema. Responde brevemente en el idioma del usuario."
+        )
 
-    from langchain_core.messages import SystemMessage, HumanMessage
+        from langchain_core.messages import SystemMessage, HumanMessage
 
-    messages = [SystemMessage(content=sys_prompt), HumanMessage(content=prompt)]
-    result = await llm.ainvoke(messages)
-    text: str = getattr(result, "content", "") or str(result)
-    return text
+        messages = [SystemMessage(content=sys_prompt), HumanMessage(content=prompt)]
+        result = await llm.ainvoke(messages)
+        text: str = getattr(result, "content", "") or str(result)
+        return text
+    except Exception as exc:
+        logger.exception(f"NLP generation failed: {exc}")
+        raise RuntimeError("NLP generation failed") from exc

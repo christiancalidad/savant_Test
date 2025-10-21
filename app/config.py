@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings
 from typing import Optional
 from urllib.parse import urlparse
@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     azure_tts_model: Optional[str] = Field(default=None, validation_alias="AZURE_TTS_MODEL")
     azure_tts_api_key: Optional[str] = Field(default=None, validation_alias="AZURE_TTS_API_KEY")
     tts_voice: str = Field(default="alloy", validation_alias="TTS_VOICE")
+
+    # Application Insights / Azure Monitor connection string
+    application_insights_connection_string: Optional[str] = Field(
+        default=None,
+        validation_alias="APPLICATIONINSIGHTS_CONNECTIONSTRING",
+        description="Azure Application Insights connection string",
+    )
 
     class Config:
         env_file = ".env"

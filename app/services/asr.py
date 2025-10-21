@@ -1,8 +1,10 @@
 from typing import Tuple
+import logging
 import mimetypes
 import httpx
 from app.config import settings
 
+logger = logging.getLogger("app.asr")
 
 async def transcribe_audio(file_path: str) -> Tuple[str, str]:
     """
@@ -59,8 +61,6 @@ async def transcribe_audio(file_path: str) -> Tuple[str, str]:
             resp.raise_for_status()
             data = resp.json()
 
-        # The response is expected to include transcription text.
-        # Common fields: "text" or nested inside choices. We'll try several options.
         transcription = (
             data.get("text")
             or (data.get("choices", [{}])[0].get("message", {}).get("content") if isinstance(data.get("choices"), list) else None)
@@ -72,5 +72,6 @@ async def transcribe_audio(file_path: str) -> Tuple[str, str]:
 
         lang = "en-US"
         return (transcription, lang)
-    except Exception:
-        return ("Error", "Error")
+    except Exception as exc:
+        logger.exception(f"ASR transcription failed: {exc}")
+        raise RuntimeError("ASR transcription failed") from exc

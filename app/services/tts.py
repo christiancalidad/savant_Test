@@ -1,8 +1,10 @@
 import base64
+import logging
 import httpx
 
 from app.config import settings
 
+logger = logging.getLogger("app.tts")
 
 async def synthesize_speech(text: str) -> tuple[str, str]:
     """
@@ -48,11 +50,9 @@ async def synthesize_speech(text: str) -> tuple[str, str]:
         mime = resp.headers.get("Content-Type", "audio/mpeg")
         b64 = base64.b64encode(audio_bytes).decode("utf-8")
         return (mime, b64)
-    except Exception:
-        # Fallback ante error: 1s de silencio WAV
-        silent_wav_bytes = _generate_silence_wav(seconds=1, sample_rate=8000)
-        b64 = base64.b64encode(silent_wav_bytes).decode("utf-8")
-        return ("audio/wav", b64)
+    except Exception as exc:
+        logger.exception(f"TTS synthesis failed: {exc}")
+        raise RuntimeError("TTS synthesis failed") from exc
 
 
 def _generate_silence_wav(seconds: int, sample_rate: int = 8000) -> bytes:

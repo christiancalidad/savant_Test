@@ -1,7 +1,36 @@
-from fastapi import FastAPI
+import logging
+import uuid
+from typing import Any
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.responses import Response
+from starlette import status
 from app.routers.voice import router as voice_router
 from app.config import settings
+from app.schemas import ErrorResponse
+
+try:
+    # Configure Azure Monitor for traces/logs/metrics when connection string is present
+    from azure.monitor.opentelemetry import configure_azure_monitor  # type: ignore
+except Exception:  # pragma: no cover - optional dependency at runtime
+    configure_azure_monitor = None  # type: ignore
+
+# Basic console logging setup
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+logger = logging.getLogger("app")
+
+# Initialize Azure Monitor (Application Insights) if configured
+if settings.application_insights_connection_string and configure_azure_monitor:
+    try:
+        configure_azure_monitor(connection_string=settings.application_insights_connection_string)
+        logger.info("Azure Monitor configured for Application Insights logging and tracing")
+    except Exception as exc:  # don't block app startup on telemetry issues
+        logger.warning(f"Failed to configure Azure Monitor: {exc}")
+else:
+    logger.info("Azure Monitor not configured (no connection string or package not available)")
 
 app = FastAPI(title=settings.app_name)
 
@@ -19,3 +48,36 @@ def health():
     return {"status": "ok"}
 
 app.include_router(voice_router)
+
+
+# Lightweight request-id middleware for correlation
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    try:
+        response: Response = await call_next(request)
+    except Exception:
+        # Ensure request-id is present even on unhandled exceptions
+        response = JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=ErrorResponse(detail="Internal server error").model_dump())
+    response.headers["x-request-id"] = request_id
+    return response
+
+
+# Global error handlers returning structured errors
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(f"Validation error: {exc} | request_id={getattr(request.state, 'request_id', '-')}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=ErrorResponse(detail="Solicitud inválida: datos no válidos").model_dump(),
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled error: {exc} | request_id={getattr(request.state, 'request_id', '-')}")
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=ErrorResponse(detail="Error interno del servidor").model_dump(),
+    )
